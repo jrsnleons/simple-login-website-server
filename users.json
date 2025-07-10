@@ -1,0 +1,18 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "testuser",
+      "email": "test@example.com",
+      "password": "$2b$10$EghbpxrqMYlsitZoxde.7uTOPbDseFkTL/cr0AfskPygq9W1yUn66",
+      "createdAt": "2025-07-10T14:44:08.247Z"
+    },
+    {
+      "id": 2,
+      "username": "johndoe",
+      "email": "john@example.com",
+      "password": "$2b$10$vL4Ta3yP9ieGNkJXCL.WCe60D59uxs0MvQKYIDzR0F5o1S0mBZbZ.",
+      "createdAt": "2025-07-10T14:53:20.013Z"
+    }
+  ]
+}
