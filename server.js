@@ -7,6 +7,8 @@ const jwt = require("jsonwebtoken");
 const fs = require("fs").promises;
 const path = require("path");
 const crypto = require("crypto");
+const { body, validationResult } = require("express-validator");
+const rateLimit = require("express-rate-limit");
 
 const app = express();
 
@@ -16,8 +18,8 @@ const corsOptions = {
         "http://localhost:3000",
         "http://localhost:3001",
         "http://localhost:8080",
-        "http://localhost:5173", // Vite default
-        "http://127.0.0.1:5500", // Live Server
+        "http://localhost:5173",
+        "http://127.0.0.1:5500",
         "http://127.0.0.1:3000",
     ],
     credentials: true,
@@ -89,7 +91,54 @@ async function saveUsers() {
 // Initialize users on startup
 loadUsers();
 
-app.post("/register", async (req, res) => {
+// Rate limiting
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // limit each IP to 5 requests per windowMs
+    message: {
+        error: "Too many authentication attempts, please try again later",
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+// Validation middleware
+const validateRegistration = [
+    body("username")
+        .isLength({ min: 3, max: 30 })
+        .withMessage("Username must be between 3 and 30 characters")
+        .matches(/^[a-zA-Z0-9_]+$/)
+        .withMessage(
+            "Username can only contain letters, numbers, and underscores"
+        ),
+    body("email")
+        .isEmail()
+        .withMessage("Please provide a valid email")
+        .normalizeEmail(),
+    body("password")
+        .isLength({ min: 8 })
+        .withMessage("Password must be at least 8 characters long")
+        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+        .withMessage(
+            "Password must contain at least one uppercase letter, one lowercase letter, and one number"
+        ),
+];
+
+const validateLogin = [
+    body("email")
+        .isEmail()
+        .withMessage("Please provide a valid email")
+        .normalizeEmail(),
+    body("password").notEmpty().withMessage("Password is required"),
+];
+
+app.post("/register", validateRegistration, async (req, res) => {
+    // Validate request
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
     try {
         const { username, email, password } = req.body;
         if (!username || !email || !password) {
@@ -109,7 +158,7 @@ app.post("/register", async (req, res) => {
 
         // Add user to storage
         const newUser = {
-            id: users.length + 1,
+            id: users.length > 0 ? Math.max(...users.map((u) => u.id)) + 1 : 1,
             username,
             email,
             password: hashedPassword,
@@ -127,7 +176,13 @@ app.post("/register", async (req, res) => {
     }
 });
 
-app.post("/login", async (req, res) => {
+app.post("/login", authLimiter, validateLogin, async (req, res) => {
+    // Validate request
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
     try {
         const { email, password } = req.body;
         if (!email || !password) {
